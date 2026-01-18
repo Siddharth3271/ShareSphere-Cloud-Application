@@ -13,7 +13,7 @@ import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-
+//fetch, cache, and provide the public keys necessary to verify the authenticity and integrity of JSON Web Tokens (JWTs) issued by the Clerk authentication service.
 @Component
 public class ClerkJwksProvider {
     @Value("${clerk.jwks-url}")

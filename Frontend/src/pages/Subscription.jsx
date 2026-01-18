@@ -152,7 +152,7 @@ const Subscription = () => {
                 await fetchUserCredits();
               }
 
-              setMessage(`Payment successful! ${plan.name} plan activated.`);
+              setMessage(`Payment successful! ${plan.name} plan activated. Details sended to your email.`);
               setMessageType("success");
             } 
             else {

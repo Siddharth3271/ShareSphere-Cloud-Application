@@ -6,10 +6,13 @@ import com.siddh.ShareSphereBackend.document.ProfileDocument;
 import com.siddh.ShareSphereBackend.dto.PaymentDTO;
 import com.siddh.ShareSphereBackend.dto.PaymentTransactionDTO;
 import com.siddh.ShareSphereBackend.dto.PaymentVerificationDTO;
+import com.siddh.ShareSphereBackend.payload.EmailNotificationPayload;
 import com.siddh.ShareSphereBackend.repository.PaymentTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import com.siddh.ShareSphereBackend.service.UserCreditsService;
 
@@ -19,6 +22,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Formatter;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +37,9 @@ public class PaymentService {
 
     @Value("${razorpay.key.secret}")
     private String razorpaySecret;
+
+    @Autowired
+    private KafkaTemplate<String, EmailNotificationPayload> kafkaTemplate;
 
     public PaymentDTO createOrder(PaymentDTO paymentDTO){
         try{
@@ -123,10 +130,35 @@ public class PaymentService {
             }
 
             if(creditsToAdd>0){
+                Optional<PaymentTransactionDTO> txOptional = paymentTransactionRepository.findByOrderId(request.getRazorpay_order_id());
+                try {
+                    if (txOptional.isPresent()) {
+                        PaymentTransactionDTO transaction = txOptional.get();
+
+                        EmailNotificationPayload payload = EmailNotificationPayload.builder()
+                                .toEmail(transaction.getUserEmail())
+                                .customerName(transaction.getUserName())
+                                .planName(plan)
+                                .amount(transaction.getAmount() / 100.0) // Convert from paisa to rupees
+                                .build();
+
+                        //Send the payload to the "email-notifications" topic
+                        kafkaTemplate.send("email-notifications", payload);
+
+                        System.out.println("PRODUCER: Published email notification task to Kafka.");
+
+                    }
+                    else {
+                        System.err.println("PRODUCER: Could not find transaction " + request.getRazorpay_order_id() + " to send email.");
+                    }
+                }
+                catch (Exception e) {
+                    System.err.println("PRODUCER: Error sending to Kafka, but payment was still successful. Error: " + e.getMessage());
+                }
                 userCreditsService.addCredits(clerkId,creditsToAdd,plan);
                 updateTransactionStatus(request.getRazorpay_order_id(),"SUCCESS", request.getRazorpay_payment_id(), creditsToAdd);
 
-                System.out.println("✅ Credits added successfully: " + creditsToAdd);
+                System.out.println("Credits added successfully: " + creditsToAdd);
                 System.out.println("=== VERIFY PAYMENT END ===");
 
                 return PaymentDTO.builder()

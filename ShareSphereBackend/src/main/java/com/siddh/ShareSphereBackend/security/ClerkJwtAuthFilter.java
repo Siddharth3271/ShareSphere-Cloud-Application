@@ -21,6 +21,7 @@ import java.security.PublicKey;
 import java.util.Base64;
 import java.util.Collections;
 
+//implements the logic for "API Gateway" style authentication where the backend trusts a signed token from an external Identity Provider (Clerk).
 @Component
 @RequiredArgsConstructor
 public class ClerkJwtAuthFilter extends OncePerRequestFilter {
